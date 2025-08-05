@@ -265,19 +265,19 @@ impl fmt::Display for Shape {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Shape::")?;
         match self {
-            Shape::Polyline(shp) => write!(f, "{}", shp),
-            Shape::PolylineM(shp) => write!(f, "{}", shp),
-            Shape::PolylineZ(shp) => write!(f, "{}", shp),
-            Shape::Point(shp) => write!(f, "{}", shp),
-            Shape::PointM(shp) => write!(f, "{}", shp),
-            Shape::PointZ(shp) => write!(f, "{}", shp),
-            Shape::Polygon(shp) => write!(f, "{}", shp),
-            Shape::PolygonM(shp) => write!(f, "{}", shp),
-            Shape::PolygonZ(shp) => write!(f, "{}", shp),
-            Shape::Multipoint(shp) => write!(f, "{}", shp),
-            Shape::MultipointM(shp) => write!(f, "{}", shp),
-            Shape::MultipointZ(shp) => write!(f, "{}", shp),
-            Shape::Multipatch(shp) => write!(f, "{}", shp),
+            Shape::Polyline(shp) => write!(f, "{shp}"),
+            Shape::PolylineM(shp) => write!(f, "{shp}"),
+            Shape::PolylineZ(shp) => write!(f, "{shp}"),
+            Shape::Point(shp) => write!(f, "{shp}"),
+            Shape::PointM(shp) => write!(f, "{shp}"),
+            Shape::PointZ(shp) => write!(f, "{shp}"),
+            Shape::Polygon(shp) => write!(f, "{shp}"),
+            Shape::PolygonM(shp) => write!(f, "{shp}"),
+            Shape::PolygonZ(shp) => write!(f, "{shp}"),
+            Shape::Multipoint(shp) => write!(f, "{shp}"),
+            Shape::MultipointM(shp) => write!(f, "{shp}"),
+            Shape::MultipointZ(shp) => write!(f, "{shp}"),
+            Shape::Multipatch(shp) => write!(f, "{shp}"),
             Shape::NullShape => write!(f, "NullShape"),
         }
     }

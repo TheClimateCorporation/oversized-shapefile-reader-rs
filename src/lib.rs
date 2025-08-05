@@ -126,23 +126,20 @@ impl From<dbase::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::IoError(e) => write!(f, "{}", e),
+            Error::IoError(e) => write!(f, "{e}"),
             Error::InvalidFileCode(code) => write!(
                 f,
-                "The file code ' {} ' is invalid, is this a Shapefile ?",
-                code
+                "The file code ' {code} ' is invalid, is this a Shapefile ?"
             ),
             Error::InvalidShapeType(code) => write!(
                 f,
-                "The code ' {} ' does not correspond to any of the ShapeType code defined by ESRI",
-                code
+                "The code ' {code} ' does not correspond to any of the ShapeType code defined by ESRI"
             ),
             Error::MismatchShapeType { requested, actual } => write!(
                 f,
-                "The requested type: '{}' does not correspond to the actual shape type: '{}'",
-                requested, actual
+                "The requested type: '{requested}' does not correspond to the actual shape type: '{actual}'"
             ),
-            e => write!(f, "{:?}", e),
+            e => write!(f, "{e:?}"),
         }
     }
 }
