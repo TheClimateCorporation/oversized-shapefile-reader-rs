@@ -5,8 +5,10 @@ use crate::{
     PolylineZ, NO_DATA,
 };
 use geo_traits::{
-    CoordTrait, LineStringTrait, MultiLineStringTrait, MultiPointTrait, MultiPolygonTrait,
-    PointTrait, PolygonTrait,
+    CoordTrait, GeometryTrait, LineStringTrait, MultiLineStringTrait, MultiPointTrait,
+    MultiPolygonTrait, PointTrait, PolygonTrait, UnimplementedLineString,
+    UnimplementedMultiLineString, UnimplementedMultiPoint, UnimplementedMultiPolygon,
+    UnimplementedPoint, UnimplementedPolygon,
 };
 
 // Shapefile points can't be null, so we implement both traits on them
@@ -75,15 +77,10 @@ impl CoordTrait for &Point {
 }
 
 impl PointTrait for Point {
-    type T = f64;
     type CoordType<'a>
         = &'a Point
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
 
     fn coord(&self) -> Option<Self::CoordType<'_>> {
         Some(self)
@@ -91,15 +88,10 @@ impl PointTrait for Point {
 }
 
 impl PointTrait for &Point {
-    type T = f64;
     type CoordType<'a>
         = &'a Point
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
 
     fn coord(&self) -> Option<Self::CoordType<'_>> {
         Some(self)
@@ -166,19 +158,10 @@ impl CoordTrait for &PointM {
 }
 
 impl PointTrait for PointM {
-    type T = f64;
     type CoordType<'a>
         = &'a PointM
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        if self.m <= NO_DATA {
-            geo_traits::Dimensions::Xy
-        } else {
-            geo_traits::Dimensions::Xym
-        }
-    }
 
     fn coord(&self) -> Option<Self::CoordType<'_>> {
         Some(self)
@@ -186,19 +169,10 @@ impl PointTrait for PointM {
 }
 
 impl PointTrait for &PointM {
-    type T = f64;
     type CoordType<'a>
         = &'a PointM
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        if self.m <= NO_DATA {
-            geo_traits::Dimensions::Xy
-        } else {
-            geo_traits::Dimensions::Xym
-        }
-    }
 
     fn coord(&self) -> Option<Self::CoordType<'_>> {
         Some(self)
@@ -279,19 +253,10 @@ impl CoordTrait for &PointZ {
 }
 
 impl PointTrait for PointZ {
-    type T = f64;
     type CoordType<'a>
         = &'a PointZ
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        if self.m <= NO_DATA {
-            geo_traits::Dimensions::Xyz
-        } else {
-            geo_traits::Dimensions::Xyzm
-        }
-    }
 
     fn coord(&self) -> Option<Self::CoordType<'_>> {
         Some(self)
@@ -299,19 +264,10 @@ impl PointTrait for PointZ {
 }
 
 impl PointTrait for &PointZ {
-    type T = f64;
     type CoordType<'a>
         = &'a PointZ
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        if self.m <= NO_DATA {
-            geo_traits::Dimensions::Xyz
-        } else {
-            geo_traits::Dimensions::Xyzm
-        }
-    }
 
     fn coord(&self) -> Option<Self::CoordType<'_>> {
         Some(self)
@@ -321,15 +277,10 @@ impl PointTrait for &PointZ {
 pub struct LineString<'a>(&'a [Point]);
 
 impl LineStringTrait for LineString<'_> {
-    type T = f64;
     type CoordType<'b>
         = &'b Point
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
 
     fn num_coords(&self) -> usize {
         self.0.len()
@@ -343,15 +294,10 @@ impl LineStringTrait for LineString<'_> {
 pub struct LineStringM<'a>(&'a [PointM]);
 
 impl LineStringTrait for LineStringM<'_> {
-    type T = f64;
     type CoordType<'b>
         = &'b PointM
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xym
-    }
 
     fn num_coords(&self) -> usize {
         self.0.len()
@@ -365,19 +311,10 @@ impl LineStringTrait for LineStringM<'_> {
 pub struct LineStringZ<'a>(&'a [PointZ]);
 
 impl LineStringTrait for LineStringZ<'_> {
-    type T = f64;
     type CoordType<'b>
         = &'b PointZ
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        // Check the first underlying coordinate to check if it's XYZ or XYZM
-        self.0
-            .first()
-            .map(CoordTrait::dim)
-            .unwrap_or(geo_traits::Dimensions::Xyz)
-    }
 
     fn num_coords(&self) -> usize {
         self.0.len()
@@ -394,15 +331,10 @@ pub struct Polygon {
 }
 
 impl<'a> PolygonTrait for &'a Polygon {
-    type T = f64;
     type RingType<'b>
         = LineString<'a>
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
 
     fn num_interiors(&self) -> usize {
         self.inner.len()
@@ -423,15 +355,10 @@ pub struct PolygonM {
 }
 
 impl<'a> PolygonTrait for &'a PolygonM {
-    type T = f64;
     type RingType<'b>
         = LineStringM<'a>
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xym
-    }
 
     fn num_interiors(&self) -> usize {
         self.inner.len()
@@ -452,19 +379,10 @@ pub struct PolygonZ {
 }
 
 impl<'a> PolygonTrait for &'a PolygonZ {
-    type T = f64;
     type RingType<'b>
         = LineStringZ<'a>
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        // Check the first coord of the outer ring to check if it's XYZ or XYZM
-        self.outer
-            .first()
-            .map(CoordTrait::dim)
-            .unwrap_or(geo_traits::Dimensions::Xyz)
-    }
 
     fn num_interiors(&self) -> usize {
         self.inner.len()
@@ -480,15 +398,10 @@ impl<'a> PolygonTrait for &'a PolygonZ {
 }
 
 impl MultiPointTrait for Multipoint {
-    type T = f64;
-    type PointType<'b>
+    type InnerPointType<'b>
         = &'b Point
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
 
     fn num_points(&self) -> usize {
         self.points().len()
@@ -500,15 +413,10 @@ impl MultiPointTrait for Multipoint {
 }
 
 impl MultiPointTrait for MultipointM {
-    type T = f64;
-    type PointType<'b>
+    type InnerPointType<'b>
         = &'b PointM
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xym
-    }
 
     fn num_points(&self) -> usize {
         self.points().len()
@@ -520,19 +428,10 @@ impl MultiPointTrait for MultipointM {
 }
 
 impl MultiPointTrait for MultipointZ {
-    type T = f64;
-    type PointType<'b>
+    type InnerPointType<'b>
         = &'b PointZ
     where
         Self: 'b;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        // Check the first point to check if it's XYZ or XYZM
-        self.points
-            .first()
-            .map(CoordTrait::dim)
-            .unwrap_or(geo_traits::Dimensions::Xyz)
-    }
 
     fn num_points(&self) -> usize {
         self.points().len()
@@ -544,15 +443,10 @@ impl MultiPointTrait for MultipointZ {
 }
 
 impl MultiLineStringTrait for Polyline {
-    type T = f64;
-    type LineStringType<'a>
+    type InnerLineStringType<'a>
         = LineString<'a>
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
 
     fn num_line_strings(&self) -> usize {
         self.parts().len()
@@ -564,15 +458,10 @@ impl MultiLineStringTrait for Polyline {
 }
 
 impl MultiLineStringTrait for PolylineM {
-    type T = f64;
-    type LineStringType<'a>
+    type InnerLineStringType<'a>
         = LineStringM<'a>
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xym
-    }
 
     fn num_line_strings(&self) -> usize {
         self.parts().len()
@@ -584,19 +473,10 @@ impl MultiLineStringTrait for PolylineM {
 }
 
 impl MultiLineStringTrait for PolylineZ {
-    type T = f64;
-    type LineStringType<'a>
+    type InnerLineStringType<'a>
         = LineStringZ<'a>
     where
         Self: 'a;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        // Check the first point to check if it's XYZ or XYZM
-        self.parts
-            .first()
-            .and_then(|line_string| line_string.first().map(CoordTrait::dim))
-            .unwrap_or(geo_traits::Dimensions::Xyz)
-    }
 
     fn num_line_strings(&self) -> usize {
         self.parts().len()
@@ -648,12 +528,7 @@ impl From<crate::Polygon> for MultiPolygon {
 }
 
 impl MultiPolygonTrait for MultiPolygon {
-    type T = f64;
-    type PolygonType<'a> = &'a Polygon;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xy
-    }
+    type InnerPolygonType<'a> = &'a Polygon;
 
     fn num_polygons(&self) -> usize {
         self.0.len()
@@ -664,10 +539,10 @@ impl MultiPolygonTrait for MultiPolygon {
     }
 }
 
-pub struct MultiPolygonM(Vec<Polygon>);
+pub struct MultiPolygonM(Vec<PolygonM>);
 
-impl From<crate::Polygon> for MultiPolygonM {
-    fn from(geom: crate::Polygon) -> Self {
+impl From<crate::PolygonM> for MultiPolygonM {
+    fn from(geom: crate::PolygonM) -> Self {
         let mut last_poly = None;
         let mut polygons = Vec::new();
         for ring in geom.into_inner() {
@@ -676,7 +551,7 @@ impl From<crate::Polygon> for MultiPolygonM {
                     if let Some(poly) = last_poly.take() {
                         polygons.push(poly);
                     }
-                    last_poly = Some(Polygon {
+                    last_poly = Some(PolygonM {
                         outer: points,
                         inner: vec![],
                     });
@@ -705,12 +580,7 @@ impl From<crate::Polygon> for MultiPolygonM {
 }
 
 impl MultiPolygonTrait for MultiPolygonM {
-    type T = f64;
-    type PolygonType<'a> = &'a Polygon;
-
-    fn dim(&self) -> geo_traits::Dimensions {
-        geo_traits::Dimensions::Xym
-    }
+    type InnerPolygonType<'a> = &'a PolygonM;
 
     fn num_polygons(&self) -> usize {
         self.0.len()
@@ -762,8 +632,1414 @@ impl From<crate::PolygonZ> for MultiPolygonZ {
 }
 
 impl MultiPolygonTrait for MultiPolygonZ {
+    type InnerPolygonType<'a> = &'a PolygonZ;
+
+    fn num_polygons(&self) -> usize {
+        self.0.len()
+    }
+
+    unsafe fn polygon_unchecked(&self, i: usize) -> Self::PolygonType<'_> {
+        &self.0[i]
+    }
+}
+
+/////////////////////////////////
+// Geometry trait implementations
+
+impl GeometryTrait for Point {
     type T = f64;
-    type PolygonType<'a> = &'a PolygonZ;
+    type PointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Point(self)
+    }
+}
+
+impl GeometryTrait for &Point {
+    type T = f64;
+    type PointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Point(self)
+    }
+}
+
+impl GeometryTrait for PointM {
+    type T = f64;
+    type PointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        if self.m <= NO_DATA {
+            geo_traits::Dimensions::Xy
+        } else {
+            geo_traits::Dimensions::Xym
+        }
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Point(self)
+    }
+}
+
+impl GeometryTrait for &PointM {
+    type T = f64;
+    type PointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        if self.m <= NO_DATA {
+            geo_traits::Dimensions::Xy
+        } else {
+            geo_traits::Dimensions::Xym
+        }
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Point(self)
+    }
+}
+
+impl GeometryTrait for PointZ {
+    type T = f64;
+    type PointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        if self.m <= NO_DATA {
+            geo_traits::Dimensions::Xyz
+        } else {
+            geo_traits::Dimensions::Xyzm
+        }
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Point(self)
+    }
+}
+
+impl GeometryTrait for &PointZ {
+    type T = f64;
+    type PointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        if self.m <= NO_DATA {
+            geo_traits::Dimensions::Xyz
+        } else {
+            geo_traits::Dimensions::Xyzm
+        }
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Point(self)
+    }
+}
+
+impl<'a> GeometryTrait for LineString<'a> {
+    type T = f64;
+    type PointType<'b>
+        = UnimplementedPoint<Self::T>
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = Self
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::LineString(self)
+    }
+}
+
+impl<'a> GeometryTrait for LineStringM<'a> {
+    type T = f64;
+    type PointType<'b>
+        = UnimplementedPoint<Self::T>
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = Self
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xym
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::LineString(self)
+    }
+}
+
+impl<'a> GeometryTrait for LineStringZ<'a> {
+    type T = f64;
+    type PointType<'b>
+        = UnimplementedPoint<Self::T>
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = Self
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        // Check the first underlying coordinate to check if it's XYZ or XYZM
+        self.0
+            .first()
+            .map(CoordTrait::dim)
+            .unwrap_or(geo_traits::Dimensions::Xyz)
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::LineString(self)
+    }
+}
+
+impl GeometryTrait for &'_ Polygon {
+    type T = f64;
+    type PointType<'b>
+        = UnimplementedPoint<Self::T>
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Polygon(self)
+    }
+}
+
+impl GeometryTrait for &'_ PolygonM {
+    type T = f64;
+    type PointType<'b>
+        = UnimplementedPoint<Self::T>
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xym
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Polygon(self)
+    }
+}
+
+impl GeometryTrait for &'_ PolygonZ {
+    type T = f64;
+    type PointType<'b>
+        = UnimplementedPoint<Self::T>
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        // Check the first coord of the outer ring to check if it's XYZ or XYZM
+        self.outer
+            .first()
+            .map(CoordTrait::dim)
+            .unwrap_or(geo_traits::Dimensions::Xyz)
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::Polygon(self)
+    }
+}
+
+impl GeometryTrait for Multipoint {
+    type T = f64;
+    type PointType<'b>
+        = &'b Point
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiPoint(self)
+    }
+}
+
+impl GeometryTrait for MultipointM {
+    type T = f64;
+    type PointType<'b>
+        = &'b PointM
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xym
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiPoint(self)
+    }
+}
+
+impl GeometryTrait for MultipointZ {
+    type T = f64;
+    type PointType<'b>
+        = &'b PointZ
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = UnimplementedLineString<Self::T>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        // Check the first point to check if it's XYZ or XYZM
+        self.points
+            .first()
+            .map(CoordTrait::dim)
+            .unwrap_or(geo_traits::Dimensions::Xyz)
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiPoint(self)
+    }
+}
+
+impl GeometryTrait for Polyline {
+    type T = f64;
+    type PointType<'b>
+        = &'b Point
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = LineString<'b>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiLineString(self)
+    }
+}
+
+impl GeometryTrait for PolylineM {
+    type T = f64;
+    type PointType<'b>
+        = &'b PointM
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = LineStringM<'b>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xym
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiLineString(self)
+    }
+}
+
+impl GeometryTrait for PolylineZ {
+    type T = f64;
+    type PointType<'b>
+        = &'b PointZ
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = LineStringZ<'b>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = UnimplementedPolygon<Self::T>
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = Self
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = UnimplementedMultiPolygon<Self::T>
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        // Check the first point to check if it's XYZ or XYZM
+        self.parts
+            .first()
+            .and_then(|line_string| line_string.first().map(CoordTrait::dim))
+            .unwrap_or(geo_traits::Dimensions::Xyz)
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiLineString(self)
+    }
+}
+
+impl GeometryTrait for MultiPolygon {
+    type T = f64;
+    type PointType<'b>
+        = &'b Point
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = LineString<'b>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = &'b Polygon
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = Self
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xy
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiPolygon(self)
+    }
+}
+
+impl GeometryTrait for MultiPolygonM {
+    type T = f64;
+    type PointType<'b>
+        = &'b PointM
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = LineStringM<'b>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = &'b PolygonM
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = Self
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
+
+    fn dim(&self) -> geo_traits::Dimensions {
+        geo_traits::Dimensions::Xym
+    }
+
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiPolygon(self)
+    }
+}
+
+impl GeometryTrait for MultiPolygonZ {
+    type T = f64;
+    type PointType<'b>
+        = &'b PointZ
+    where
+        Self: 'b;
+    type LineStringType<'b>
+        = LineStringZ<'b>
+    where
+        Self: 'b;
+    type PolygonType<'b>
+        = &'b PolygonZ
+    where
+        Self: 'b;
+    type MultiPointType<'b>
+        = UnimplementedMultiPoint<Self::T>
+    where
+        Self: 'b;
+    type MultiLineStringType<'b>
+        = UnimplementedMultiLineString<Self::T>
+    where
+        Self: 'b;
+    type MultiPolygonType<'b>
+        = Self
+    where
+        Self: 'b;
+    type GeometryCollectionType<'b>
+        = geo_traits::UnimplementedGeometryCollection<Self::T>
+    where
+        Self: 'b;
+    type RectType<'b>
+        = geo_traits::UnimplementedRect<f64>
+    where
+        Self: 'b;
+    type LineType<'b>
+        = geo_traits::UnimplementedLine<f64>
+    where
+        Self: 'b;
+    type TriangleType<'b>
+        = geo_traits::UnimplementedTriangle<f64>
+    where
+        Self: 'b;
 
     fn dim(&self) -> geo_traits::Dimensions {
         // Check the first polygon to check if it's XYZ or XYZM
@@ -773,11 +2049,21 @@ impl MultiPolygonTrait for MultiPolygonZ {
             .unwrap_or(geo_traits::Dimensions::Xyz)
     }
 
-    fn num_polygons(&self) -> usize {
-        self.0.len()
-    }
-
-    unsafe fn polygon_unchecked(&self, i: usize) -> Self::PolygonType<'_> {
-        &self.0[i]
+    fn as_type(
+        &self,
+    ) -> geo_traits::GeometryType<
+        '_,
+        Self::PointType<'_>,
+        Self::LineStringType<'_>,
+        Self::PolygonType<'_>,
+        Self::MultiPointType<'_>,
+        Self::MultiLineStringType<'_>,
+        Self::MultiPolygonType<'_>,
+        Self::GeometryCollectionType<'_>,
+        Self::RectType<'_>,
+        Self::TriangleType<'_>,
+        Self::LineType<'_>,
+    > {
+        geo_traits::GeometryType::MultiPolygon(self)
     }
 }
