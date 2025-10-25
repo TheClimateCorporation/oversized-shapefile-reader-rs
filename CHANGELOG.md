@@ -1,3 +1,8 @@
+# unreleased
+- Added `Polygon::try_into_geo_traits()`, which converts a polygon to an object that implements
+  `geo_traits::PolygonTrait`.
+- Converting to `geo_types::Polygon` is now fallible (i.e. `TryFrom`, not `From`).
+
 # 0.7.0
  - Bumped dbase to 0.6
  - Added `yore` and `encoding_rs` features which are forwarded to `dbase`

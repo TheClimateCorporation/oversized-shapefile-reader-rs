@@ -336,7 +336,7 @@ impl EsriShape for Multipatch {
 }
 /// Converts a Multipatch to Multipolygon
 ///
-/// For simplicity,reasons, Triangle Fan & Triangle Strip are considered
+/// For simplicity,reasons, Triangle Fan & Triangle Strip are not considered
 /// to be valid polygons
 /// `
 /// When the individual types of rings in a collection of rings representing a polygonal patch with holes
@@ -346,7 +346,7 @@ impl EsriShape for Multipatch {
 /// `
 #[cfg(feature = "geo-types")]
 impl TryFrom<Multipatch> for geo_types::MultiPolygon<f64> {
-    type Error = &'static str;
+    type Error = Error;
 
     fn try_from(mp: Multipatch) -> Result<Self, Self::Error> {
         use geo_types::{Coord, LineString};
@@ -355,12 +355,8 @@ impl TryFrom<Multipatch> for geo_types::MultiPolygon<f64> {
         let mut last_poly = None;
         for patch in mp.patches {
             match patch {
-                Patch::TriangleStrip(_) => {
-                    return Err("Cannot convert Multipatch::TriangleStrip to Multipolygon")
-                }
-                Patch::TriangleFan(_) => {
-                    return Err("Cannot convert Multipatch::TriangleFan to Multipolygon")
-                }
+                Patch::TriangleStrip(_) => return Err(Error::UnsupportedConversion),
+                Patch::TriangleFan(_) => return Err(Error::UnsupportedConversion),
                 Patch::OuterRing(points) | Patch::FirstRing(points) => {
                     let exterior = points
                         .into_iter()
@@ -381,11 +377,7 @@ impl TryFrom<Multipatch> for geo_types::MultiPolygon<f64> {
                     if let Some(poly) = last_poly.as_mut() {
                         poly.interiors_push(interior);
                     } else {
-                        // This is the strange (?) case: inner ring without a previous outer ring
-                        polygons.push(geo_types::Polygon::<f64>::new(
-                            LineString::<f64>::from(Vec::<Coord<f64>>::new()),
-                            vec![LineString::from(interior)],
-                        ));
+                        return Err(Error::OrphanedInnerRing);
                     }
                 }
             }

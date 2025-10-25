@@ -215,7 +215,7 @@ impl<PointType: HasXY> From<Vec<PointType>> for PolygonRing<PointType> {
 /// # #[cfg(feature = "geo-types")]
 /// # fn main() -> Result<(), shapefile::Error>{
 /// let mut polygons = shapefile::read_shapes_as::<_, shapefile::PolygonM>("tests/data/polygonm.shp")?;
-/// let geo_polygon: geo_types::MultiPolygon<f64> = polygons.pop().unwrap().into();
+/// let geo_polygon: geo_types::MultiPolygon<f64> = polygons.pop().unwrap().try_into()?;
 /// let polygon = shapefile::PolygonZ::from(geo_polygon);
 /// # Ok(())
 /// # }
@@ -380,8 +380,20 @@ impl<PointType: HasXY> From<GenericPolyline<PointType>> for GenericPolygon<Point
  * Polygon
 */
 /// Specialization of the `GenericPolygon` struct to represent a `Polygon` shape
-/// ( collection of [Point](../point/struct.Point.html))
+/// (collection of [Point](../point/struct.Point.html))
+///
+/// Note that, unlike other shapes, `Polygon` doesn't implement the
+/// `geo_traits::MultiPolygon` trait directly. Please use [Self::try_into_geo_traits]`.
 pub type Polygon = GenericPolygon<Point>;
+
+impl Polygon {
+    /// Returns an opaque representation of the polygon that implements the
+    /// `geo_traits::MultiPolygon` trait.
+    #[cfg(feature = "geo-traits")]
+    pub fn try_into_geo_traits(self) -> Result<crate::geo_traits_impl::MultiPolygon, crate::Error> {
+        self.try_into()
+    }
+}
 
 impl fmt::Display for Polygon {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -435,8 +447,22 @@ impl EsriShape for Polygon {
  */
 
 /// Specialization of the `GenericPolygon` struct to represent a `PolygonM` shape
-/// ( collection of [PointM](../point/struct.PointM.html))
+/// (collection of [PointM](../point/struct.PointM.html))
+///
+/// Note that, unlike other shapes, `PolygonM` doesn't implement the
+/// `geo_traits::MultiPolygon` trait directly. Please use [Self::try_into_geo_traits]`.
 pub type PolygonM = GenericPolygon<PointM>;
+
+impl PolygonM {
+    /// Returns an opaque representation of the polygon that implements the
+    /// `geo_traits::MultiPolygonM` trait.
+    #[cfg(feature = "geo-traits")]
+    pub fn try_into_geo_traits(
+        self,
+    ) -> Result<crate::geo_traits_impl::MultiPolygonM, crate::Error> {
+        self.try_into()
+    }
+}
 
 impl fmt::Display for PolygonM {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -495,8 +521,22 @@ impl EsriShape for PolygonM {
  */
 
 /// Specialization of the `GenericPolygon` struct to represent a `PolygonZ` shape
-/// ( collection of [PointZ](../point/struct.PointZ.html))
+/// (collection of [PointZ](../point/struct.PointZ.html))
+///
+/// Note that, unlike other shapes, `PolygonZ` doesn't implement the
+/// `geo_traits::MultiPolygon` trait directly. Please use [Self::try_into_geo_traits]`.
 pub type PolygonZ = GenericPolygon<PointZ>;
+
+impl PolygonZ {
+    /// Returns an opaque representation of the polygon that implements the
+    /// `geo_traits::MultiPolygonZ` trait.
+    #[cfg(feature = "geo-traits")]
+    pub fn try_into_geo_traits(
+        self,
+    ) -> Result<crate::geo_traits_impl::MultiPolygonZ, crate::Error> {
+        self.try_into()
+    }
+}
 
 impl fmt::Display for PolygonZ {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -556,12 +596,14 @@ impl EsriShape for PolygonZ {
 }
 
 #[cfg(feature = "geo-types")]
-impl<PointType> From<GenericPolygon<PointType>> for geo_types::MultiPolygon<f64>
+impl<PointType> TryFrom<GenericPolygon<PointType>> for geo_types::MultiPolygon<f64>
 where
     PointType: ShrinkablePoint + GrowablePoint + Copy,
     geo_types::Coord<f64>: From<PointType>,
 {
-    fn from(p: GenericPolygon<PointType>) -> Self {
+    type Error = crate::Error;
+
+    fn try_from(p: GenericPolygon<PointType>) -> Result<Self, Self::Error> {
         let mut last_poly = None;
         let mut polygons = Vec::<geo_types::Polygon<f64>>::new();
         for ring in p.rings {
@@ -586,11 +628,7 @@ where
                     if let Some(poly) = last_poly.as_mut() {
                         poly.interiors_push(interior);
                     } else {
-                        // This is the strange (?) case: inner ring without a previous outer ring
-                        polygons.push(geo_types::Polygon::<f64>::new(
-                            LineString::<f64>::from(Vec::<Coord<f64>>::new()),
-                            vec![LineString::from(interior)],
-                        ));
+                        return Err(crate::Error::OrphanedInnerRing);
                     }
                 }
             }
@@ -598,7 +636,7 @@ where
         if let Some(poly) = last_poly.take() {
             polygons.push(poly);
         }
-        polygons.into()
+        Ok(polygons.into())
     }
 }
 
@@ -659,7 +697,8 @@ mod test_geo_types {
             Point::new(-1.1, -1.01),
         ]));
 
-        let converted_multipolygon = geo_types::MultiPolygon::<f64>::from(simple_polygon);
+        let converted_multipolygon =
+            geo_types::MultiPolygon::<f64>::try_from(simple_polygon).unwrap();
 
         let converted_polygon = converted_multipolygon.into_iter().next().unwrap();
 
@@ -686,7 +725,7 @@ mod test_geo_types {
             Point::new(1.4, -1.04),
         ]));
 
-        let converted_polygon = geo_types::MultiPolygon::<f64>::from(simple_polygon);
+        let converted_polygon = geo_types::MultiPolygon::<f64>::try_from(simple_polygon).unwrap();
 
         let converted_polygon = converted_polygon.into_iter().next().unwrap();
 
@@ -749,7 +788,8 @@ mod test_geo_types {
             ]),
         ]);
 
-        let converted_multipolygon = geo_types::MultiPolygon::<f64>::from(one_ring_polygon);
+        let converted_multipolygon =
+            geo_types::MultiPolygon::<f64>::try_from(one_ring_polygon).unwrap();
 
         let converted_polygon = converted_multipolygon.into_iter().next().unwrap();
 

@@ -106,6 +106,12 @@ pub enum Error {
         actual: ShapeType,
     },
     InvalidShapeRecordSize,
+    /// The Polygon shape read from the file contains an orphaned inner ring,
+    /// which doesn't have the corresponding outer ring.
+    #[cfg(feature = "geo-types")]
+    OrphanedInnerRing,
+    #[cfg(feature = "geo-types")]
+    UnsupportedConversion,
     DbaseError(dbase::Error),
     MissingDbf,
     MissingIndexFile,
@@ -139,6 +145,10 @@ impl fmt::Display for Error {
                 f,
                 "The requested type: '{requested}' does not correspond to the actual shape type: '{actual}'"
             ),
+            #[cfg(feature = "geo-types")]
+            Error::OrphanedInnerRing => write!(f, "Inner ring without a previous outer ring"),
+            #[cfg(feature = "geo-types")]
+            Error::UnsupportedConversion => writeln!(f, "The conversion is not supported"),
             e => write!(f, "{e:?}"),
         }
     }

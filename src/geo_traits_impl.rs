@@ -489,8 +489,10 @@ impl MultiLineStringTrait for PolylineZ {
 
 pub struct MultiPolygon(Vec<Polygon>);
 
-impl From<crate::Polygon> for MultiPolygon {
-    fn from(geom: crate::Polygon) -> Self {
+impl TryFrom<crate::Polygon> for MultiPolygon {
+    type Error = crate::Error;
+
+    fn try_from(geom: crate::Polygon) -> Result<Self, Self::Error> {
         let mut last_poly = None;
         let mut polygons = Vec::new();
         for ring in geom.into_inner() {
@@ -508,12 +510,7 @@ impl From<crate::Polygon> for MultiPolygon {
                     if let Some(poly) = last_poly.as_mut() {
                         poly.inner.push(points);
                     } else {
-                        panic!("inner ring without a previous outer ring");
-                        // This is the strange (?) case: inner ring without a previous outer ring
-                        // polygons.push(geo_types::Polygon::<f64>::new(
-                        //     LineString::<f64>::from(Vec::<Coordinate<f64>>::new()),
-                        //     vec![LineString::from(interior)],
-                        // ));
+                        return Err(crate::Error::OrphanedInnerRing);
                     }
                 }
             }
@@ -523,7 +520,7 @@ impl From<crate::Polygon> for MultiPolygon {
             polygons.push(poly);
         }
 
-        Self(polygons)
+        Ok(Self(polygons))
     }
 }
 
@@ -541,8 +538,10 @@ impl MultiPolygonTrait for MultiPolygon {
 
 pub struct MultiPolygonM(Vec<PolygonM>);
 
-impl From<crate::PolygonM> for MultiPolygonM {
-    fn from(geom: crate::PolygonM) -> Self {
+impl TryFrom<crate::PolygonM> for MultiPolygonM {
+    type Error = crate::Error;
+
+    fn try_from(geom: crate::PolygonM) -> Result<Self, Self::Error> {
         let mut last_poly = None;
         let mut polygons = Vec::new();
         for ring in geom.into_inner() {
@@ -560,12 +559,7 @@ impl From<crate::PolygonM> for MultiPolygonM {
                     if let Some(poly) = last_poly.as_mut() {
                         poly.inner.push(points);
                     } else {
-                        panic!("inner ring without a previous outer ring");
-                        // This is the strange (?) case: inner ring without a previous outer ring
-                        // polygons.push(geo_types::Polygon::<f64>::new(
-                        //     LineString::<f64>::from(Vec::<Coordinate<f64>>::new()),
-                        //     vec![LineString::from(interior)],
-                        // ));
+                        return Err(crate::Error::OrphanedInnerRing);
                     }
                 }
             }
@@ -575,7 +569,7 @@ impl From<crate::PolygonM> for MultiPolygonM {
             polygons.push(poly);
         }
 
-        Self(polygons)
+        Ok(Self(polygons))
     }
 }
 
@@ -593,8 +587,10 @@ impl MultiPolygonTrait for MultiPolygonM {
 
 pub struct MultiPolygonZ(Vec<PolygonZ>);
 
-impl From<crate::PolygonZ> for MultiPolygonZ {
-    fn from(geom: crate::PolygonZ) -> Self {
+impl TryFrom<crate::PolygonZ> for MultiPolygonZ {
+    type Error = crate::Error;
+
+    fn try_from(geom: crate::PolygonZ) -> Result<Self, Self::Error> {
         let mut last_poly = None;
         let mut polygons = Vec::new();
         for ring in geom.into_inner() {
@@ -612,12 +608,7 @@ impl From<crate::PolygonZ> for MultiPolygonZ {
                     if let Some(poly) = last_poly.as_mut() {
                         poly.inner.push(points);
                     } else {
-                        panic!("inner ring without a previous outer ring");
-                        // This is the strange (?) case: inner ring without a previous outer ring
-                        // polygons.push(geo_types::Polygon::<f64>::new(
-                        //     LineString::<f64>::from(Vec::<Coordinate<f64>>::new()),
-                        //     vec![LineString::from(interior)],
-                        // ));
+                        return Err(crate::Error::OrphanedInnerRing);
                     }
                 }
             }
@@ -627,7 +618,7 @@ impl From<crate::PolygonZ> for MultiPolygonZ {
             polygons.push(poly);
         }
 
-        Self(polygons)
+        Ok(Self(polygons))
     }
 }
 

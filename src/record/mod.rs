@@ -431,12 +431,12 @@ impl_to_way_conversion!(Shape::Multipatch <=> Multipatch);
 /// their geo_types counter parts can fail. And the NullShape has no equivalent Geometry;
 #[cfg(feature = "geo-types")]
 impl TryFrom<Shape> for geo_types::Geometry<f64> {
-    type Error = &'static str;
+    type Error = Error;
 
     fn try_from(shape: Shape) -> Result<Self, Self::Error> {
         use geo_types::Geometry;
         match shape {
-            Shape::NullShape => Err("Cannot convert NullShape into any geo_types Geometry"),
+            Shape::NullShape => Err(Error::UnsupportedConversion),
             Shape::Point(point) => Ok(Geometry::Point(geo_types::Point::from(point))),
             Shape::PointM(point) => Ok(Geometry::Point(geo_types::Point::from(point))),
             Shape::PointZ(point) => Ok(Geometry::Point(geo_types::Point::from(point))),
@@ -449,15 +449,15 @@ impl TryFrom<Shape> for geo_types::Geometry<f64> {
             Shape::PolylineZ(polyline) => Ok(Geometry::MultiLineString(
                 geo_types::MultiLineString::<f64>::from(polyline),
             )),
-            Shape::Polygon(polygon) => Ok(Geometry::MultiPolygon(
-                geo_types::MultiPolygon::<f64>::from(polygon),
-            )),
-            Shape::PolygonM(polygon) => Ok(Geometry::MultiPolygon(
-                geo_types::MultiPolygon::<f64>::from(polygon),
-            )),
-            Shape::PolygonZ(polygon) => Ok(Geometry::MultiPolygon(
-                geo_types::MultiPolygon::<f64>::from(polygon),
-            )),
+            Shape::Polygon(polygon) => {
+                geo_types::MultiPolygon::<f64>::try_from(polygon).map(Geometry::MultiPolygon)
+            }
+            Shape::PolygonM(polygon) => {
+                geo_types::MultiPolygon::<f64>::try_from(polygon).map(Geometry::MultiPolygon)
+            }
+            Shape::PolygonZ(polygon) => {
+                geo_types::MultiPolygon::<f64>::try_from(polygon).map(Geometry::MultiPolygon)
+            }
             Shape::Multipoint(multipoint) => Ok(Geometry::MultiPoint(
                 geo_types::MultiPoint::<f64>::from(multipoint),
             )),
