@@ -817,3 +817,14 @@ fn read_point_as_wrong_type() {
         panic!();
     }
 }
+
+#[test]
+fn supports_wrongly_sized_polylines() {
+    // This file contains some polygons where the record size in their header is
+    // bigger than what we would expect given the number of points
+    //
+    // We used to have strict size checks, which meant we wsere rejecting this kind of file
+    const PATH: &str = "./tests/data/ne_10m_lakes_north_america.shp";
+    let polygons = shapefile::read_shapes_as::<_, Polygon>(PATH).unwrap();
+    assert_eq!(polygons.len(), 1162);
+}

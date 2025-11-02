@@ -11,7 +11,7 @@ use super::{HasShapeType, Point};
 use super::{PointM, PointZ};
 use super::{Polyline, PolylineM, PolylineZ};
 use core::fmt;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use std::mem::size_of;
 
 #[cfg(feature = "geo-types")]
@@ -408,7 +408,7 @@ impl HasShapeType for Polygon {
 }
 
 impl ConcreteReadableShape for Polygon {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         Polyline::read_shape_content(source, record_size).map(Polygon::from)
     }
 }
@@ -477,7 +477,7 @@ impl HasShapeType for PolygonM {
 }
 
 impl ConcreteReadableShape for PolygonM {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         PolylineM::read_shape_content(source, record_size).map(PolygonM::from)
     }
 }
@@ -551,7 +551,7 @@ impl HasShapeType for PolygonZ {
 }
 
 impl ConcreteReadableShape for PolygonZ {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         PolylineZ::read_shape_content(source, record_size).map(PolygonZ::from)
     }
 }

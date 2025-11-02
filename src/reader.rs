@@ -100,7 +100,7 @@ fn read_index_file<T: Read>(mut source: T) -> Result<Vec<ShapeIndex>, Error> {
 }
 
 /// Reads and returns one shape and its header from the source
-fn read_one_shape_as<T: Read, S: ReadableShape>(
+fn read_one_shape_as<T: Read + Seek, S: ReadableShape>(
     mut source: &mut T,
 ) -> Result<(record::RecordHeader, S), Error> {
     let hdr = record::RecordHeader::read_from(&mut source)?;

@@ -1,7 +1,7 @@
 //! Shape records
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 
 pub mod bbox;
 pub(crate) mod io;
@@ -44,16 +44,16 @@ pub trait ConcreteShape: Sized + HasShapeType {}
 pub trait ConcreteReadableShape: ConcreteShape {
     /// Function that actually reads the `ActualShape` from the source
     /// and returns it
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error>;
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error>;
 }
 
 /// Trait implemented by all the Shapes that can be read
 pub trait ReadableShape: Sized {
-    fn read_from<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error>;
+    fn read_from<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error>;
 }
 
 impl<S: ConcreteReadableShape> ReadableShape for S {
-    fn read_from<T: Read>(mut source: &mut T, mut record_size: i32) -> Result<S, Error> {
+    fn read_from<T: Read + Seek>(mut source: &mut T, mut record_size: i32) -> Result<S, Error> {
         let shapetype = ShapeType::read_from(&mut source)?;
         record_size -= std::mem::size_of::<i32>() as i32;
         if shapetype == Self::shapetype() {
@@ -192,9 +192,9 @@ impl HasShapeType for Shape {
 }
 
 impl ReadableShape for Shape {
-    fn read_from<T: Read>(mut source: &mut T, mut record_size: i32) -> Result<Self, Error> {
+    fn read_from<T: Read + Seek>(mut source: &mut T, mut record_size: i32) -> Result<Self, Error> {
         let shapetype = ShapeType::read_from(&mut source)?;
-        record_size -= std::mem::size_of::<i32>() as i32;
+        record_size -= size_of::<i32>() as i32;
         let shape = match shapetype {
             ShapeType::Polyline => {
                 Shape::Polyline(Polyline::read_shape_content(&mut source, record_size)?)

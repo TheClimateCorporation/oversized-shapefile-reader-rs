@@ -1,6 +1,6 @@
 //! Module with the definition of Point, PointM and PointZ
 
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 use super::EsriShape;
 use super::{ShapeType, NO_DATA};
@@ -52,14 +52,21 @@ impl HasShapeType for Point {
 }
 
 impl ConcreteReadableShape for Point {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
-        if record_size == 2 * size_of::<f64>() as i32 {
-            let x = source.read_f64::<LittleEndian>()?;
-            let y = source.read_f64::<LittleEndian>()?;
-            Ok(Self { x, y })
-        } else {
-            Err(Error::InvalidShapeRecordSize)
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+        const EXPECTED_SIZE: i32 = 2 * size_of::<f64>() as i32;
+        let diff = record_size - EXPECTED_SIZE;
+        if diff < 0 {
+            return Err(Error::InvalidShapeRecordSize);
         }
+
+        let x = source.read_f64::<LittleEndian>()?;
+        let y = source.read_f64::<LittleEndian>()?;
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
+        }
+
+        Ok(Self { x, y })
     }
 }
 
@@ -163,15 +170,22 @@ impl HasShapeType for PointM {
 }
 
 impl ConcreteReadableShape for PointM {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
-        if record_size == 3 * size_of::<f64>() as i32 {
-            let x = source.read_f64::<LittleEndian>()?;
-            let y = source.read_f64::<LittleEndian>()?;
-            let m = source.read_f64::<LittleEndian>()?;
-            Ok(Self { x, y, m })
-        } else {
-            Err(Error::InvalidShapeRecordSize)
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+        const EXPECTED_SIZE: i32 = 3 * size_of::<f64>() as i32;
+        let diff = record_size - EXPECTED_SIZE;
+        if diff < 0 {
+            return Err(Error::InvalidShapeRecordSize);
         }
+
+        let x = source.read_f64::<LittleEndian>()?;
+        let y = source.read_f64::<LittleEndian>()?;
+        let m = source.read_f64::<LittleEndian>()?;
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
+        }
+
+        Ok(Self { x, y, m })
     }
 }
 
@@ -308,17 +322,24 @@ impl HasShapeType for PointZ {
 }
 
 impl ConcreteReadableShape for PointZ {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
-        if record_size == 3 * size_of::<f64>() as i32 {
-            let point = Self::read_xyz(source)?;
-            Ok(point)
-        } else if record_size == 4 * size_of::<f64>() as i32 {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+        let (point, diff) = if record_size >= 4 * size_of::<f64>() as i32 {
+            let expected = 4 * size_of::<f64>() as i32;
             let mut point = Self::read_xyz(source)?;
             point.m = source.read_f64::<LittleEndian>()?;
-            Ok(point)
+            (point, record_size - expected)
+        } else if record_size >= 3 * size_of::<f64>() as i32 {
+            let expected = 3 * size_of::<f64>() as i32;
+            let point = Self::read_xyz(source)?;
+            (point, record_size - expected)
         } else {
-            Err(Error::InvalidShapeRecordSize)
+            return Err(Error::InvalidShapeRecordSize);
+        };
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
         }
+        Ok(point)
     }
 }
 

@@ -2,7 +2,7 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::size_of;
 
 use super::io::*;
@@ -233,7 +233,7 @@ impl HasShapeType for Multipatch {
 }
 
 impl ConcreteReadableShape for Multipatch {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         let reader = MultiPartShapeReader::<PointZ, T>::new(source)?;
 
         let record_size_with_m =
@@ -241,34 +241,45 @@ impl ConcreteReadableShape for Multipatch {
         let record_size_without_m =
             Self::size_of_record(reader.num_points, reader.num_parts, false) as i32;
 
-        if (record_size != record_size_with_m) & (record_size != record_size_without_m) {
-            Err(Error::InvalidShapeRecordSize)
+        let size_read = if record_size >= record_size_with_m {
+            record_size_with_m
         } else {
-            let mut patch_types = vec![PatchType::Ring; reader.num_parts as usize];
-            let mut patches = Vec::<Patch>::with_capacity(reader.num_parts as usize);
-            for i in 0..reader.num_parts {
-                patch_types[i as usize] = PatchType::read_from(reader.source)?;
-            }
-            let (bbox, patches_points) = reader
-                .read_xy()
-                .and_then(|rdr| rdr.read_zs())
-                .and_then(|rdr| rdr.read_ms_if(record_size == record_size_with_m))
-                .map_err(Error::IoError)
-                .map(|rdr| (rdr.bbox, rdr.parts))?;
+            record_size_without_m
+        };
 
-            for (patch_type, points) in patch_types.iter().zip(patches_points) {
-                let patch = match patch_type {
-                    PatchType::TriangleStrip => Patch::TriangleStrip(points),
-                    PatchType::TriangleFan => Patch::TriangleFan(points),
-                    PatchType::OuterRing => Patch::OuterRing(points),
-                    PatchType::InnerRing => Patch::InnerRing(points),
-                    PatchType::FirstRing => Patch::FirstRing(points),
-                    PatchType::Ring => Patch::Ring(points),
-                };
-                patches.push(patch);
-            }
-            Ok(Self { bbox, patches })
+        let diff = record_size - size_read;
+        if diff < 0 {
+            return Err(Error::InvalidShapeRecordSize);
         }
+
+        let mut patch_types = vec![PatchType::Ring; reader.num_parts as usize];
+        let mut patches = Vec::<Patch>::with_capacity(reader.num_parts as usize);
+        for i in 0..reader.num_parts {
+            patch_types[i as usize] = PatchType::read_from(reader.source)?;
+        }
+        let (bbox, patches_points) = reader
+            .read_xy()
+            .and_then(|rdr| rdr.read_zs())
+            .and_then(|rdr| rdr.read_ms_if(record_size >= record_size_with_m))
+            .map_err(Error::IoError)
+            .map(|rdr| (rdr.bbox, rdr.parts))?;
+
+        for (patch_type, points) in patch_types.iter().zip(patches_points) {
+            let patch = match patch_type {
+                PatchType::TriangleStrip => Patch::TriangleStrip(points),
+                PatchType::TriangleFan => Patch::TriangleFan(points),
+                PatchType::OuterRing => Patch::OuterRing(points),
+                PatchType::InnerRing => Patch::InnerRing(points),
+                PatchType::FirstRing => Patch::FirstRing(points),
+                PatchType::Ring => Patch::Ring(points),
+            };
+            patches.push(patch);
+        }
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
+        }
+        Ok(Self { bbox, patches })
     }
 }
 

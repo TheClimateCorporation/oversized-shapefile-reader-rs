@@ -1,9 +1,5 @@
 //! Module with the definition of Polyline, PolylineM, PolylineZ
 
-use std::fmt;
-use std::io::{Read, Write};
-use std::mem::size_of;
-
 use super::io::*;
 use super::traits::{GrowablePoint, ShrinkablePoint};
 use super::ConcreteReadableShape;
@@ -11,6 +7,9 @@ use super::GenericBBox;
 use super::{Error, ShapeType};
 use super::{EsriShape, HasShapeType, WritableShape};
 use super::{Point, PointM, PointZ};
+use std::fmt;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::mem::size_of;
 
 #[cfg(feature = "geo-types")]
 use geo_types;
@@ -176,16 +175,25 @@ impl HasShapeType for Polyline {
 }
 
 impl ConcreteReadableShape for Polyline {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         let rdr = MultiPartShapeReader::<Point, T>::new(source)?;
-        if record_size != Self::size_of_record(rdr.num_points, rdr.num_parts) as i32 {
-            Err(Error::InvalidShapeRecordSize)
-        } else {
-            rdr.read_xy().map_err(Error::IoError).map(|rdr| Self {
-                bbox: rdr.bbox,
-                parts: rdr.parts,
-            })
+
+        let expected_size = Self::size_of_record(rdr.num_points, rdr.num_parts) as i32;
+        let diff = record_size - expected_size;
+        if diff < 0 {
+            return Err(Error::InvalidShapeRecordSize);
         }
+
+        let poly = rdr.read_xy().map_err(Error::IoError).map(|rdr| Self {
+            bbox: rdr.bbox,
+            parts: rdr.parts,
+        })?;
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
+        }
+
+        Ok(poly)
     }
 }
 
@@ -250,24 +258,38 @@ impl HasShapeType for PolylineM {
 }
 
 impl ConcreteReadableShape for PolylineM {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         let rdr = MultiPartShapeReader::<PointM, T>::new(source)?;
 
         let record_size_with_m = Self::size_of_record(rdr.num_points, rdr.num_parts, true) as i32;
         let record_size_without_m =
             Self::size_of_record(rdr.num_points, rdr.num_parts, false) as i32;
 
-        if (record_size != record_size_with_m) && (record_size != record_size_without_m) {
-            Err(Error::InvalidShapeRecordSize)
+        let size_read = if record_size >= record_size_with_m {
+            record_size_with_m
         } else {
-            rdr.read_xy()
-                .and_then(|rdr| rdr.read_ms_if(record_size == record_size_with_m))
-                .map_err(Error::IoError)
-                .map(|rdr| Self {
-                    bbox: rdr.bbox,
-                    parts: rdr.parts,
-                })
+            record_size_without_m
+        };
+
+        let diff = record_size - size_read;
+        if diff < 0 {
+            return Err(Error::InvalidShapeRecordSize);
         }
+
+        let polyline_m = rdr
+            .read_xy()
+            .and_then(|rdr| rdr.read_ms_if(record_size >= record_size_with_m))
+            .map_err(Error::IoError)
+            .map(|rdr| Self {
+                bbox: rdr.bbox,
+                parts: rdr.parts,
+            })?;
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
+        }
+
+        Ok(polyline_m)
     }
 }
 
@@ -339,25 +361,38 @@ impl HasShapeType for PolylineZ {
 }
 
 impl ConcreteReadableShape for PolylineZ {
-    fn read_shape_content<T: Read>(source: &mut T, record_size: i32) -> Result<Self, Error> {
+    fn read_shape_content<T: Read + Seek>(source: &mut T, record_size: i32) -> Result<Self, Error> {
         let rdr = MultiPartShapeReader::<PointZ, T>::new(source)?;
 
         let record_size_with_m = Self::size_of_record(rdr.num_points, rdr.num_parts, true) as i32;
         let record_size_without_m =
             Self::size_of_record(rdr.num_points, rdr.num_parts, false) as i32;
 
-        if (record_size != record_size_with_m) && (record_size != record_size_without_m) {
-            Err(Error::InvalidShapeRecordSize)
+        let size_read = if record_size >= record_size_with_m {
+            record_size_with_m
         } else {
-            rdr.read_xy()
-                .and_then(|rdr| rdr.read_zs())
-                .and_then(|rdr| rdr.read_ms_if(record_size == record_size_with_m))
-                .map_err(Error::IoError)
-                .map(|rdr| Self {
-                    bbox: rdr.bbox,
-                    parts: rdr.parts,
-                })
+            record_size_without_m
+        };
+
+        let diff = record_size - size_read;
+        if diff < 0 {
+            return Err(Error::InvalidShapeRecordSize);
         }
+
+        let polyline_z = rdr
+            .read_xy()
+            .and_then(|rdr| rdr.read_zs())
+            .and_then(|rdr| rdr.read_ms_if(record_size >= record_size_with_m))
+            .map_err(Error::IoError)
+            .map(|rdr| Self {
+                bbox: rdr.bbox,
+                parts: rdr.parts,
+            })?;
+
+        if diff > 0 {
+            source.seek(SeekFrom::Current(i64::from(diff)))?;
+        }
+        Ok(polyline_z)
     }
 }
 
@@ -497,7 +532,7 @@ mod test_geo_types_conversions {
 
         let multiline_string: MultiLineString<f64> = polyline_m.into();
 
-        let expected_multiline = geo_types::MultiLineString(vec![
+        let expected_multiline = MultiLineString(vec![
             LineString::<f64>(vec![
                 Coord { x: 1.0, y: 5.0 },
                 Coord { x: 5.0, y: 5.0 },
@@ -543,7 +578,7 @@ mod test_geo_types_conversions {
 
     #[test]
     fn test_multi_line_string_into_polyline() {
-        let multiline_string = geo_types::MultiLineString(vec![
+        let multiline_string = MultiLineString(vec![
             LineString::<f64>(vec![
                 Coord { x: 1.0, y: 5.0 },
                 Coord { x: 5.0, y: 5.0 },
