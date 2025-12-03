@@ -56,48 +56,13 @@
 //! - [read_shapes_as]
 
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek};
 use std::path::Path;
-
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::header;
 use crate::record;
 use crate::record::ReadableShape;
 use crate::{Error, Shape};
-
-const INDEX_RECORD_SIZE: usize = 2 * std::mem::size_of::<i32>();
-
-#[derive(Copy, Clone)]
-pub(crate) struct ShapeIndex {
-    pub offset: i32,
-    pub record_size: i32,
-}
-
-impl ShapeIndex {
-    pub(crate) fn write_to<W: Write>(self, dest: &mut W) -> std::io::Result<()> {
-        dest.write_i32::<BigEndian>(self.offset)?;
-        dest.write_i32::<BigEndian>(self.record_size)?;
-        Ok(())
-    }
-}
-
-/// Read the content of a .shx file
-fn read_index_file<T: Read>(mut source: T) -> Result<Vec<ShapeIndex>, Error> {
-    let header = header::Header::read_from(&mut source)?;
-
-    let num_shapes = ((header.file_length * 2) - header::HEADER_SIZE) / INDEX_RECORD_SIZE as i32;
-    let mut shapes_index = Vec::<ShapeIndex>::with_capacity(num_shapes as usize);
-    for _ in 0..num_shapes {
-        let offset = source.read_i32::<BigEndian>()?;
-        let record_size = source.read_i32::<BigEndian>()?;
-        shapes_index.push(ShapeIndex {
-            offset,
-            record_size,
-        });
-    }
-    Ok(shapes_index)
-}
 
 /// Reads and returns one shape and its header from the source
 fn read_one_shape_as<T: Read + Seek, S: ReadableShape>(
@@ -119,9 +84,6 @@ pub struct ShapeIterator<'a, T: Read, S: ReadableShape> {
     // How many bytes the header said there are in
     // the file.
     file_length: usize,
-    // Iterator over the shape indices, used to seek
-    // to the start of a shape when reading
-    shapes_indices: Option<std::slice::Iter<'a, ShapeIndex>>,
 }
 
 impl<T: Read + Seek, S: ReadableShape> Iterator for ShapeIterator<'_, T, S> {
@@ -131,18 +93,6 @@ impl<T: Read + Seek, S: ReadableShape> Iterator for ShapeIterator<'_, T, S> {
         if self.current_pos >= self.file_length {
             None
         } else {
-            if let Some(ref mut shapes_indices) = self.shapes_indices {
-                // Its 'safer' to seek to the shape offset when we have the `shx` file
-                // as some shapes may not be stored sequentially and may contain 'garbage'
-                // bytes between them
-                let start_pos = shapes_indices.next()?.offset * 2;
-                if start_pos != self.current_pos as i32 {
-                    if let Err(err) = self.source.seek(SeekFrom::Start(start_pos as u64)) {
-                        return Some(Err(err.into()));
-                    }
-                    self.current_pos = start_pos as usize;
-                }
-            }
             let (hdr, shape) = match read_one_shape_as::<T, S>(self.source) {
                 Err(e) => return Some(Err(e)),
                 Ok(hdr_and_shape) => hdr_and_shape,
@@ -151,13 +101,6 @@ impl<T: Read + Seek, S: ReadableShape> Iterator for ShapeIterator<'_, T, S> {
             self.current_pos += hdr.record_size as usize * 2;
             Some(Ok(shape))
         }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.shapes_indices
-            .as_ref()
-            .map(|s| s.size_hint())
-            .unwrap_or((0, None))
     }
 }
 
@@ -197,7 +140,6 @@ impl<T: Read + Seek, D: Read + Seek, S: ReadableShape, R: dbase::ReadableRecord>
 pub struct ShapeReader<T> {
     source: T,
     header: header::Header,
-    shapes_index: Option<Vec<ShapeIndex>>,
 }
 
 impl<T: Read> ShapeReader<T> {
@@ -219,47 +161,16 @@ impl<T: Read> ShapeReader<T> {
     /// # fn main() -> Result<(), shapefile::Error> {
     /// use std::fs::File;
     /// let file = File::open("tests/data/line.shp")?;
-    /// let reader = shapefile::ShapeReader::new(file)?;
+    /// let reader = shapefile::ShapeReader::new(file, 272)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(mut source: T) -> Result<Self, Error> {
-        let header = header::Header::read_from(&mut source)?;
+    pub fn new(mut source: T, file_size: usize) -> Result<Self, Error> {
+        let header = header::Header::read_from(&mut source, file_size)?;
 
         Ok(Self {
             source,
             header,
-            shapes_index: None,
-        })
-    }
-
-    /// Creates a new ShapeReader using 2 sources, one for the _.shp_
-    /// the other for the _.shx_
-    ///
-    /// The _.shp_ header is read upon creation
-    /// and the whole _.shx_ file is read upon creation.
-    ///
-    /// # Example
-    /// ```no_run
-    /// # fn main() -> Result<(), shapefile::Error> {
-    /// use std::fs::File;
-    /// let shp_file = File::open("cities.shp")?;
-    /// let shx_file = File::open("cities.shx:")?;
-    /// let reader = shapefile::ShapeReader::with_shx(shp_file, shx_file)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_shx<ShxSource>(mut source: T, shx_source: ShxSource) -> Result<Self, Error>
-    where
-        ShxSource: Read,
-    {
-        let shapes_index = Some(read_index_file(shx_source)?);
-        let header = header::Header::read_from(&mut source)?;
-
-        Ok(Self {
-            source,
-            header,
-            shapes_index,
         })
     }
 
@@ -355,8 +266,7 @@ impl<T: Read + Seek> ShapeReader<T> {
             _shape: std::marker::PhantomData,
             source: &mut self.source,
             current_pos: header::HEADER_SIZE as usize,
-            file_length: (self.header.file_length as usize) * 2,
-            shapes_indices: self.shapes_index.as_ref().map(|s| s.iter()),
+            file_length: self.header.file_length as usize,
         }
     }
 
@@ -393,121 +303,16 @@ impl<T: Read + Seek> ShapeReader<T> {
     pub fn iter_shapes(&mut self) -> ShapeIterator<'_, T, Shape> {
         self.iter_shapes_as::<Shape>()
     }
-
-    /// Reads the `n`th shape of the shapefile
-    ///
-    /// # Important
-    ///
-    /// Even though in shapefiles, shapes are indexed starting from '1'.
-    /// this method expects indexes starting from 0.
-    ///
-    /// # Returns
-    ///
-    /// `None` if the index is out of range
-    ///
-    /// # Errors
-    ///
-    /// This method will return an `Error::MissingIndexFile` if you use it
-    /// but no *.shx* was found when opening the shapefile.
-    pub fn read_nth_shape_as<S: ReadableShape>(
-        &mut self,
-        index: usize,
-    ) -> Option<Result<S, Error>> {
-        if let Some(ref shapes_index) = self.shapes_index {
-            if index >= shapes_index.len() {
-                return None;
-            }
-
-            if let Err(e) = self.seek(index) {
-                return Some(Err(e));
-            }
-
-            let (_, shape) = match read_one_shape_as::<T, S>(&mut self.source) {
-                Err(e) => return Some(Err(e)),
-                Ok(hdr_and_shape) => hdr_and_shape,
-            };
-
-            if let Err(e) = self
-                .source
-                .seek(SeekFrom::Start(header::HEADER_SIZE as u64))
-            {
-                return Some(Err(Error::IoError(e)));
-            }
-            Some(Ok(shape))
-        } else {
-            Some(Err(Error::MissingIndexFile))
-        }
-    }
-
-    /// Reads the `n`th shape of the shapefile
-    pub fn read_nth_shape(&mut self, index: usize) -> Option<Result<Shape, Error>> {
-        self.read_nth_shape_as::<Shape>(index)
-    }
-
-    /// Seek to the start of the shape at `index`
-    ///
-    /// # Error
-    ///
-    /// Returns [Error::MissingIndexFile] if the _shx_ file
-    /// was not found by [ShapeReader::from_path] or the reader
-    /// was not constructed with [ShapeReader::with_shx]
-    pub fn seek(&mut self, index: usize) -> Result<(), Error> {
-        if let Some(ref shapes_index) = self.shapes_index {
-            let offset = shapes_index
-                .get(index)
-                .map(|shape_idx| (shape_idx.offset * 2) as u64);
-
-            match offset {
-                Some(n) => self.source.seek(SeekFrom::Start(n)),
-                None => self.source.seek(SeekFrom::End(0)),
-            }?;
-            Ok(())
-        } else {
-            Err(Error::MissingIndexFile)
-        }
-    }
-
-    /// Returns the number of shapes in the shapefile
-    ///
-    /// # Error
-    ///
-    /// Returns [Error::MissingIndexFile] if the _shx_ file
-    /// was not found by [ShapeReader::from_path] or the reader
-    /// was not constructed with [ShapeReader::with_shx]
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let reader = shapefile::ShapeReader::from_path("tests/data/point.shp").unwrap();
-    /// // point.shp has a .shx file next to it, so we can read the count data
-    /// assert_eq!(1, reader.shape_count().unwrap());
-    ///
-    /// let reader = shapefile::ShapeReader::from_path("tests/data/pointm.shp").unwrap();
-    /// // There is no pointm.shx, so the shape_count() method returns error
-    /// assert!(reader.shape_count().is_err(), "Should return error if no index file");
-    /// ```
-    pub fn shape_count(&self) -> Result<usize, Error> {
-        if let Some(ref shapes_index) = self.shapes_index {
-            Ok(shapes_index.len())
-        } else {
-            Err(Error::MissingIndexFile)
-        }
-    }
 }
 
 impl ShapeReader<BufReader<File>> {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let shape_path = path.as_ref().to_path_buf();
-        let shx_path = shape_path.with_extension("shx");
+        let file_size = std::fs::metadata(&shape_path)?.len();
 
         let source = BufReader::new(File::open(shape_path)?);
 
-        if shx_path.exists() {
-            let index_source = BufReader::new(File::open(shx_path)?);
-            Self::with_shx(source, index_source)
-        } else {
-            Self::new(source)
-        }
+        Self::new(source, file_size.try_into().unwrap())
     }
 }
 
@@ -589,20 +394,6 @@ impl<T: Read + Seek, D: Read + Seek> Reader<T, D> {
     /// ```
     pub fn read(&mut self) -> Result<Vec<(Shape, dbase::Record)>, Error> {
         self.read_as::<Shape, dbase::Record>()
-    }
-
-    /// Seeks to the start of the shape at `index`
-    pub fn seek(&mut self, index: usize) -> Result<(), Error> {
-        self.shape_reader.seek(index)?;
-        self.dbase_reader.seek(index)?;
-        Ok(())
-    }
-
-    /// Returns the number of shapes in the shapefile
-    ///
-    /// See [ShapeReader::shape_count]
-    pub fn shape_count(&self) -> Result<usize, Error> {
-        self.shape_reader.shape_count()
     }
 
     /// Consumes the self and returns the dbase table info

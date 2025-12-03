@@ -1,8 +1,6 @@
 //! Bounding Boxes
 use super::traits::{GrowablePoint, HasM, HasXY, HasZ, ShrinkablePoint};
-use super::EsriShape;
 use super::PointZ;
-use crate::writer::{f64_max, f64_min};
 
 /// The Bounding Box type used in this crate.
 ///
@@ -102,26 +100,3 @@ impl<PointType: Default> Default for GenericBBox<PointType> {
 
 pub type BBoxZ = GenericBBox<PointZ>;
 
-impl BBoxZ {
-    pub(crate) fn grow_from_shape<S: EsriShape>(&mut self, shape: &S) {
-        let x_range = shape.x_range();
-        let y_range = shape.y_range();
-        let z_range = shape.z_range();
-        let m_range = shape.m_range();
-
-        self.min.x = f64_min(x_range[0], self.min.x);
-        self.max.x = f64_max(x_range[1], self.max.x);
-        self.min.y = f64_min(y_range[0], self.min.y);
-        self.max.y = f64_max(y_range[1], self.max.y);
-
-        if S::shapetype().has_m() {
-            self.min.m = f64_min(m_range[0], self.min.m);
-            self.max.m = f64_max(m_range[1], self.max.m);
-        }
-
-        if S::shapetype().has_z() {
-            self.min.z = f64_min(z_range[0], self.min.z);
-            self.max.z = f64_max(z_range[1], self.max.z);
-        }
-    }
-}

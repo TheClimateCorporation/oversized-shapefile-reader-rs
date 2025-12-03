@@ -1,10 +1,10 @@
 use super::{Error, ShapeType};
 
 use crate::record::BBoxZ;
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Read, Write};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use std::io::Read;
 
-pub(crate) const HEADER_SIZE: i32 = 100;
+pub(crate) const HEADER_SIZE: usize = 100;
 const FILE_CODE: i32 = 9994;
 /// Size of reserved bytes in the header, that have do defined use
 const SIZE_OF_SKIP: usize = size_of::<i32>() * 5;
@@ -14,7 +14,7 @@ const SIZE_OF_SKIP: usize = size_of::<i32>() * 5;
 #[derive(Copy, Clone, PartialEq)]
 pub struct Header {
     /// Total file length (Header + Shapes) in 16bit word
-    pub file_length: i32,
+    pub file_length: usize,
     /// The bbox contained all the shapes in this shapefile
     ///
     /// For shapefiles where the shapes do not have `m` or `z` values
@@ -39,7 +39,7 @@ impl Default for Header {
 }
 
 impl Header {
-    pub fn read_from<T: Read>(mut source: &mut T) -> Result<Header, Error> {
+    pub fn read_from<T: Read>(mut source: &mut T, file_size: usize) -> Result<Header, Error> {
         let file_code = source.read_i32::<BigEndian>()?;
 
         if file_code != FILE_CODE {
@@ -49,7 +49,8 @@ impl Header {
         let mut skip: [u8; SIZE_OF_SKIP] = [0; SIZE_OF_SKIP];
         source.read_exact(&mut skip)?;
 
-        let file_length = source.read_i32::<BigEndian>()?;
+        let _ = source.read_i32::<BigEndian>()?;
+        let file_length = file_size;
         let version = source.read_i32::<LittleEndian>()?;
         let shape_type = ShapeType::read_from(&mut source)?;
 
@@ -71,28 +72,6 @@ impl Header {
 
         Ok(hdr)
     }
-
-    pub(crate) fn write_to<T: Write>(&self, dest: &mut T) -> Result<(), std::io::Error> {
-        dest.write_i32::<BigEndian>(FILE_CODE)?;
-
-        let skip: [u8; SIZE_OF_SKIP] = [0; SIZE_OF_SKIP];
-        dest.write_all(&skip)?;
-
-        dest.write_i32::<BigEndian>(self.file_length)?;
-        dest.write_i32::<LittleEndian>(self.version)?;
-        dest.write_i32::<LittleEndian>(self.shape_type as i32)?;
-
-        dest.write_f64::<LittleEndian>(self.bbox.min.x)?;
-        dest.write_f64::<LittleEndian>(self.bbox.min.y)?;
-        dest.write_f64::<LittleEndian>(self.bbox.max.x)?;
-        dest.write_f64::<LittleEndian>(self.bbox.max.y)?;
-        dest.write_f64::<LittleEndian>(self.bbox.min.z)?;
-        dest.write_f64::<LittleEndian>(self.bbox.max.z)?;
-        dest.write_f64::<LittleEndian>(self.bbox.min.m)?;
-        dest.write_f64::<LittleEndian>(self.bbox.max.m)?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -106,9 +85,9 @@ mod tests {
         use std::io::Cursor;
 
         let mut src = Cursor::new(vec![]);
-        src.write_i32::<BigEndian>(42).unwrap();
+        crate::byteorder::WriteBytesExt::write_i32::<BigEndian>(&mut src, 42).unwrap();
 
         src.seek(SeekFrom::Start(0)).unwrap();
-        assert!(Header::read_from(&mut src).is_err());
+        assert!(Header::read_from(&mut src, 1234).is_err());
     }
 }

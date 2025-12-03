@@ -1,5 +1,5 @@
 //! Shape records
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use std::fmt;
 use std::io::{Read, Seek, Write};
 
@@ -286,7 +286,6 @@ impl fmt::Display for Shape {
 /// Header of a shape record, present before any shape record
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct RecordHeader {
-    pub record_number: i32,
     pub record_size: i32,
 }
 
@@ -294,18 +293,11 @@ impl RecordHeader {
     pub(crate) const SIZE: usize = 2 * std::mem::size_of::<i32>();
 
     pub fn read_from<T: Read>(source: &mut T) -> Result<RecordHeader, Error> {
-        let record_number = source.read_i32::<BigEndian>()?;
+        let _ = source.read_i32::<BigEndian>()?; // record_number
         let record_size = source.read_i32::<BigEndian>()?;
         Ok(RecordHeader {
-            record_number,
             record_size,
         })
-    }
-
-    pub fn write_to<T: Write>(&self, dest: &mut T) -> Result<(), std::io::Error> {
-        dest.write_i32::<BigEndian>(self.record_number)?;
-        dest.write_i32::<BigEndian>(self.record_size)?;
-        Ok(())
     }
 }
 

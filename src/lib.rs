@@ -67,9 +67,9 @@ pub mod writer;
 #[cfg(feature = "geo-traits")]
 mod geo_traits_impl;
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::Read;
 
 pub use reader::{read, read_as, read_shapes, read_shapes_as, Reader, ShapeReader};
 pub use record::Multipatch;
@@ -79,7 +79,6 @@ pub use record::{Patch, Shape, NO_DATA};
 pub use record::{Point, PointM, PointZ};
 pub use record::{Polygon, PolygonM, PolygonRing, PolygonZ};
 pub use record::{Polyline, PolylineM, PolylineZ};
-pub use writer::{ShapeWriter, Writer};
 
 extern crate core;
 #[cfg(feature = "geo-types")]
@@ -183,11 +182,6 @@ impl ShapeType {
     pub(crate) fn read_from<T: Read>(source: &mut T) -> Result<ShapeType, Error> {
         let code = source.read_i32::<LittleEndian>()?;
         Self::from(code).ok_or(Error::InvalidShapeType(code))
-    }
-
-    pub(crate) fn write_to<T: Write>(self, dest: &mut T) -> Result<(), std::io::Error> {
-        dest.write_i32::<LittleEndian>(self as i32)?;
-        Ok(())
     }
 
     /// Returns the ShapeType corresponding to the input code
